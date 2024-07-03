@@ -1,7 +1,7 @@
 ## Project Setup
 
 - [x] Connect git
-- [ ] Base project setup
+- [x] Base project setup
 
 ## Deployment and Startup
 
