@@ -1,0 +1,34 @@
+services:
+  deepchecks_logger:
+    container_name: deepchecks_logger
+    image: deepchecks_logger:1.0
+    build: .
+    ports:
+      - "5001:5001"
+    environment:
+      - DB_URL=postgresql://postgres:postgres@deepchecks_db:5432/postgres
+    depends_on:
+      deepchecks_db:
+        condition: service_healthy
+
+  deepchecks_db:
+    container_name: deepchecks_db
+    image: postgres:14.5
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=deepchecks
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - type: volume
+        source: deepchecks_db_data
+        target: /temp/db/deepchecks_db_data
+
+volumes:
+  deepchecks_db_data:

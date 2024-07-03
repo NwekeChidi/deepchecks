@@ -5,8 +5,8 @@
 
 ## Deployment and Startup
 
-- [ ] Define docker configurations
-- [ ] Define postgres configuration
+- [x] Define docker configurations
+- [x] Define postgres configuration
 - [ ] Define deployment script
 - [ ] Define Database Schema
 - [ ] Define one-time project pre-startup script
