@@ -1,5 +1,6 @@
 from celery import Celery
 from flask import Flask, jsonify, make_response, request
+from werkzeug.utils import secure_filename
 from werkzeug.exceptions import HTTPException, default_exceptions
 
 from os import environ
@@ -7,21 +8,21 @@ from utils.calculateMetrics import calculate_metrics
 from models.log_alerts import LogAlertsModel
 from utils.db import db
 
-import io
+import os
 import csv
-import itertools
 
 ALLOWED_EXTENSIONS = { "csv" }
+FS_TASK_QUEUE = os.getcwd()
 
 
 def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 # initialize flask app
 app = Flask(__name__)
 app.config['BUNDLE_ERRORS'] = environ.get('BUNDLE_ERRORS')
+app.config['UPLOAD_FOLDER'] = FS_TASK_QUEUE
 
 
 # Celery configuration
@@ -62,28 +63,32 @@ def test():
 
 ## define function to handle task in the backgroud
 @celery.task
-def process_file(file, input_threshold, input_condition, 
+def process_file(file_path, input_threshold, input_condition, 
                   output_threshold, output_condition):
-  db_inserts = []
-  # read the csv file
-  file_content = io.StringIO(file.stream.read().decode("utf-8"))
-  read_csv = csv.reader(file_content)
+  print("entered here", file_path)
+  with app.app_context():
+    db_inserts = []
+    # read the csv file
+    # file_content = io.StringIO(file.stream.read().decode("utf-8"))
+    with open(file_path, "rt") as in_file:
+      read_csv = csv.reader(in_file)
 
-  for row in itertools.islice(read_csv, 1, None):
-    print(row)
-    db_inserts.append(calculate_metrics(row, input_threshold, input_condition, 
-                                        output_threshold, output_condition))
-  
-  # save to db
-  db.session.bulk_save_objects(db_inserts)
-  db.session.commit()
+      next(read_csv, None)
+      for row in read_csv: #itertools.islice(read_csv, 1, None):
+        db_inserts.append(calculate_metrics(row, input_threshold, input_condition, 
+                                            output_threshold, output_condition))
+    # save to db
+    db.session.bulk_save_objects(db_inserts)
+    db.session.commit()
+
+    # remove file after processing
+    os.remove(file_path)
+
 
 # create post route to process llm logs
 @app.route("/deepchecks/process", methods=["POST"])
 def process_logs():
   try:
-
-    # db_inserts = []
     # handle threshold and conditions
     acceptable_conditions = ["le", "lt", "eq", "ge", "gt"]
     input_threshold = 50
@@ -102,34 +107,32 @@ def process_logs():
     # process file
     file = request.files["file"]
     if file and allowed_file(file.filename):
+
+      # upload to task queue
+      filename = secure_filename(file.filename)
+      file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+      file.save(file_path)
       
-      # handle task in the background
-      process_file.delay(file, input_threshold, input_condition, 
+      # send task to the background
+      process_file.delay(file_path, input_threshold, input_condition, 
                   output_threshold, output_condition)
-
-      # # read the csv file
-      # file_content = io.StringIO(file.stream.read().decode("utf-8"))
-      # read_csv = csv.reader(file_content)
-
-      # for row in itertools.islice(read_csv, 1, None):
-      #   print(row)
-      #   db_inserts.append(calculate_metrics(row, input_threshold, input_condition, 
-      #                                       output_threshold, output_condition))
       
-      # # save to db
-      # db.session.bulk_save_objects(db_inserts)
-      # db.session.commit()
+      return jsonify({
+          "status": True,
+          "message": "Logs received and queued successfully"
+        }), 200
 
     return make_response(jsonify({
-      "status": True,
-      "message": "Logs queued successfully"
-    })), 200
+      "status": False,
+      "message": "Invalid File Format"
+    })), 400
   except Exception as err:
     print("Error: >>", err)
     return make_response(jsonify({ 
       "status": False,
       "message": "Something went wrong 😕" })), 500
   
+
 
 # create route to get processed llm log given an id
 @app.route("/deepchecks/<int:id>", methods=["GET"])
@@ -153,6 +156,7 @@ def get_llm_log(id):
     return make_response(jsonify({ 
       "status": False,
       "message": "Something went wrong 😕" })), 500
+
 
 if __name__ == '__main__':
   app.run()
