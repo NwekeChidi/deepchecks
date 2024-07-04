@@ -13,7 +13,7 @@
 
 ## Business Logic
 
-- [ ] Build endpoint `POST` for arbitrary metrics calculation and database persisting
+- [x] Build endpoint `POST` for arbitrary metrics calculation and database persisting
 - [ ] Build endpoint `GET` to get alerts for specific LLM interaction with an `id`
 - [ ] Add API Documentation
 - [ ] Update README
