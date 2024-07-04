@@ -55,7 +55,6 @@ def test():
 @app.route("/deepchecks/process", methods=["POST"])
 def process_logs():
   try:
-    print("this is request", request)
 
     db_inserts = []
     # handle threshold and conditions
