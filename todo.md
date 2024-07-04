@@ -8,7 +8,7 @@
 - [x] Define docker configurations
 - [x] Define postgres configuration
 - [ ] Define deployment script
-- [ ] Define Database Schema
+- [x] Define Database Schema
 - [ ] Define one-time project pre-startup script
 
 ## Business Logic
