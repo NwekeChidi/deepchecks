@@ -3,6 +3,7 @@ from werkzeug.exceptions import HTTPException, default_exceptions
 
 from os import environ
 from utils.calculateMetrics import calculate_metrics
+from models.log_alerts import LogAlertsModel
 from utils.db import db
 
 import io
@@ -27,7 +28,7 @@ app.config['BUNDLE_ERRORS'] = environ.get('BUNDLE_ERRORS')
 def error_handler(error):
   status_code = 500
   if isinstance(error, HTTPException): status_code = error.code
-  print("this is error", error)
+  print("Error Encountered: >>", error)
   return jsonify(error), status_code
 
 # handle default errors
@@ -50,7 +51,7 @@ def test():
     "message": "test route"})), 200
 
 
-# create post route
+# create post route to process llm logs
 @app.route("/deepchecks/process", methods=["POST"])
 def process_logs():
   try:
@@ -93,6 +94,30 @@ def process_logs():
       "status": True,
       "message": "Logs processed successfully"
     })), 200
+  except Exception as err:
+    print("Error: >>", err)
+    return make_response(jsonify({ 
+      "status": False,
+      "message": "Something went wrong 😕" })), 500
+  
+
+# create route to get processed llm log given an id
+@app.route("/deepchecks/<int:id>", methods=["GET"])
+def get_llm_log(id):
+  try:
+    llm_log = LogAlertsModel.query.filter_by(id=id).first()
+    if llm_log:
+      return make_response(
+        jsonify({
+          "status": True,
+          "message": "Log Retrieved",
+          "data": llm_log.json()
+        })
+      ), 200
+    else: 
+      return make_response(jsonify({ 
+      "status": False,
+      "message": "Log Not Found" })), 404
   except Exception as err:
     print("Error: >>", err)
     return make_response(jsonify({ 
