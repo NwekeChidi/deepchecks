@@ -67,7 +67,7 @@ To successfully initialize and spin up this project, you need:
 
 ### Postman Documentation
 
-<button name="button" onclick="https://documenter.getpostman.com/view/19837110/2sA3dygVmr">API Documentation</button>
+[`API Documentation`](https://documenter.getpostman.com/view/19837110/2sA3dygVmr)
 
 ---
 
