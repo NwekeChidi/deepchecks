@@ -19,6 +19,7 @@
 
 ---
 
+- [x] Handle File Processing As a background task
 - [ ] Request Validation
 - [ ] Database Record Deduplication (Handle errors resulting from individual record duplication)
 - [ ] Code refactoring

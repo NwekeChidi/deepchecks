@@ -1,3 +1,4 @@
+from celery import Celery
 from flask import Flask, jsonify, make_response, request
 from werkzeug.exceptions import HTTPException, default_exceptions
 
@@ -7,7 +8,6 @@ from models.log_alerts import LogAlertsModel
 from utils.db import db
 
 import io
-import os
 import csv
 import itertools
 
@@ -22,6 +22,15 @@ def allowed_file(filename):
 # initialize flask app
 app = Flask(__name__)
 app.config['BUNDLE_ERRORS'] = environ.get('BUNDLE_ERRORS')
+
+
+# Celery configuration
+app.config['CELERY_BROKER_URL'] = 'redis://redis:6379/0'
+app.config['CELERY_RESULT_BACKEND'] = 'redis://redis:6379/0'
+
+celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
+celery.conf.update(app.config)
+
 
 # define error handlers
 @app.errorhandler(Exception)
@@ -51,12 +60,30 @@ def test():
     "message": "test route"})), 200
 
 
+## define function to handle task in the backgroud
+@celery.task
+def process_file(file, input_threshold, input_condition, 
+                  output_threshold, output_condition):
+  db_inserts = []
+  # read the csv file
+  file_content = io.StringIO(file.stream.read().decode("utf-8"))
+  read_csv = csv.reader(file_content)
+
+  for row in itertools.islice(read_csv, 1, None):
+    print(row)
+    db_inserts.append(calculate_metrics(row, input_threshold, input_condition, 
+                                        output_threshold, output_condition))
+  
+  # save to db
+  db.session.bulk_save_objects(db_inserts)
+  db.session.commit()
+
 # create post route to process llm logs
 @app.route("/deepchecks/process", methods=["POST"])
 def process_logs():
   try:
 
-    db_inserts = []
+    # db_inserts = []
     # handle threshold and conditions
     acceptable_conditions = ["le", "lt", "eq", "ge", "gt"]
     input_threshold = 50
@@ -75,23 +102,27 @@ def process_logs():
     # process file
     file = request.files["file"]
     if file and allowed_file(file.filename):
-
-      # read the csv file
-      file_content = io.StringIO(file.stream.read().decode("utf-8"))
-      read_csv = csv.reader(file_content)
-
-      for row in itertools.islice(read_csv, 1, None):
-        print(row)
-        db_inserts.append(calculate_metrics(row, input_threshold, input_condition, 
-                                            output_threshold, output_condition))
       
-      # save to db
-      db.session.bulk_save_objects(db_inserts)
-      db.session.commit()
+      # handle task in the background
+      process_file.delay(file, input_threshold, input_condition, 
+                  output_threshold, output_condition)
+
+      # # read the csv file
+      # file_content = io.StringIO(file.stream.read().decode("utf-8"))
+      # read_csv = csv.reader(file_content)
+
+      # for row in itertools.islice(read_csv, 1, None):
+      #   print(row)
+      #   db_inserts.append(calculate_metrics(row, input_threshold, input_condition, 
+      #                                       output_threshold, output_condition))
+      
+      # # save to db
+      # db.session.bulk_save_objects(db_inserts)
+      # db.session.commit()
 
     return make_response(jsonify({
       "status": True,
-      "message": "Logs processed successfully"
+      "message": "Logs queued successfully"
     })), 200
   except Exception as err:
     print("Error: >>", err)
