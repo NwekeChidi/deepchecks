@@ -59,11 +59,13 @@ def process_logs():
     db_inserts = []
     # handle threshold and conditions
     acceptable_conditions = ["le", "lt", "eq", "ge", "gt"]
-    threshold = 50
+    input_threshold = 50
+    output_threshold = 10
     input_condition = "le"
-    output_condition = "gt"
+    output_condition = "ge"
 
-    if threshold in request.form: threshold = int(request.form["threshold"])
+    if "input_threshold" in request.form: input_threshold = int(request.form["input_threshold"])
+    if "output_threshold" in request.form: output_threshold = int(request.form["output_threshold"])
 
     if "input_condition" in request.form and request.form["input_condition"] in acceptable_conditions:
       input_condition = request.form["input_condition"]
@@ -80,7 +82,8 @@ def process_logs():
 
       for row in itertools.islice(read_csv, 1, None):
         print(row)
-        db_inserts.append(calculate_metrics(row, threshold, input_condition, output_condition))
+        db_inserts.append(calculate_metrics(row, input_threshold, input_condition, 
+                                            output_threshold, output_condition))
       
       # save to db
       db.session.bulk_save_objects(db_inserts)
