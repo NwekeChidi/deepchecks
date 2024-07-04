@@ -15,7 +15,7 @@
 - [x] Build endpoint `POST` for arbitrary metrics calculation and database persisting
 - [x] Build endpoint `GET` to get alerts for specific LLM interaction with an `id`
 - [x] Add API Documentation
-- [ ] Update README
+- [x] Update README
 
 ---
 
